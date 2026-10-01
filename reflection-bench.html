@@ -1,0 +1,773 @@
+<title>Reflection Bench v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#F2F1ED; --panel:#FFFFFF; --panel-2:#F7F6F2; --rule:#DCD9D1;
+  --ink:#1B1D22; --ink-2:#5C6068; --ink-3:#8E9299;
+  --amber:#B57A18; --cyan:#1F6E85; --violet:#6B5AA6;
+  --stage-frame:#E4E1D9;
+  --shadow:0 1px 2px rgba(27,29,34,.06),0 8px 24px rgba(27,29,34,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#141619; --panel:#1C1F24; --panel-2:#22262C; --rule:#31363E;
+    --ink:#E9EBEE; --ink-2:#9AA1AB; --ink-3:#6C737D;
+    --amber:#D6A44C; --cyan:#5FB3C9; --violet:#A99BE0;
+    --stage-frame:#0E1013;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#141619; --panel:#1C1F24; --panel-2:#22262C; --rule:#31363E;
+  --ink:#E9EBEE; --ink-2:#9AA1AB; --ink-3:#6C737D;
+  --amber:#D6A44C; --cyan:#5FB3C9; --violet:#A99BE0;
+  --stage-frame:#0E1013;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font:400 14px/1.5 Barlow,system-ui,sans-serif;min-height:100vh}
+h1,h2{margin:0;font-family:"Barlow Condensed",Barlow,sans-serif;font-weight:600;letter-spacing:.01em}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+.bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:12px 20px;border-bottom:1px solid var(--rule);background:var(--panel)}
+.bar h1{font-size:21px;text-transform:uppercase;letter-spacing:.06em}
+.bar .sub{color:var(--ink-2);font-size:13px}
+.bar .spacer{flex:1}
+.pill{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.03em;
+  color:var(--ink-2);border:1px solid var(--rule);border-radius:2px;padding:4px 9px}
+input[type=file]{display:none}
+
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 372px}
+@media (max-width:1080px){.wrap{grid-template-columns:1fr}}
+
+.bench{padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.holder{background:var(--stage-frame);border:1px solid var(--rule);border-radius:3px;
+  overflow:auto;padding:16px;display:flex;justify-content:center}
+.holder.drop{outline:2px dashed var(--amber);outline-offset:-6px}
+.stagebox{flex:none;position:relative}
+.stage{width:1024px;height:1024px;position:relative;transform-origin:top left;
+  overflow:hidden;box-shadow:var(--shadow)}
+.stage>*{position:absolute;inset:0}
+.surface{background:#FFFFFF}
+.rmask{mask-repeat:no-repeat;mask-size:100% 100%;
+  -webkit-mask-repeat:no-repeat;-webkit-mask-size:100% 100%}
+.rblur,.r3d{width:1024px;height:1024px}
+.rimg{mask-repeat:no-repeat;mask-size:100% 100%;
+  -webkit-mask-repeat:no-repeat;-webkit-mask-size:100% 100%}
+.rimg,.orig{width:1024px;height:1024px;display:block}
+.guides{pointer-events:none}
+.guides.off{display:none}
+
+.legend{display:flex;gap:18px;align-items:center;flex-wrap:wrap;
+  font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3)}
+.legend i{display:inline-block;width:16px;height:0;border-top:2px dashed currentColor;
+  vertical-align:middle;margin-right:6px}
+.legend .f{color:var(--amber)} .legend .t{color:var(--cyan)} .legend .s{color:var(--violet)}
+
+.rail{border-left:1px solid var(--rule);background:var(--panel);
+  min-height:100vh;padding-bottom:24px;display:flex;flex-direction:column}
+@media (max-width:1080px){.rail{border-left:0;border-top:1px solid var(--rule);min-height:0}}
+.sect{border-bottom:1px solid var(--rule);padding:13px 18px 15px}
+.sect>h2{font-size:12px;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-2)}
+.sect>h2 em{font-style:normal;font-size:10px;letter-spacing:.06em;margin-left:7px;
+  font-family:"IBM Plex Mono",monospace}
+.sect.front>h2 em{color:var(--amber)} .sect.temple>h2 em{color:var(--cyan)}
+.sect>.hint{font-size:12px;color:var(--ink-3);margin:3px 0 10px;max-width:46ch}
+
+.ctl{display:grid;grid-template-columns:80px minmax(0,1fr) 58px;align-items:center;
+  gap:10px;padding:2px 0}
+.ctl-name{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl-val{font-family:"IBM Plex Mono",monospace;font-size:11.5px;
+  font-variant-numeric:tabular-nums;text-align:right}
+.ctl input[type=range]{width:100%;accent-color:var(--amber);height:18px;margin:0}
+.sect.temple .ctl input[type=range]{accent-color:var(--cyan)}
+
+.btnrow{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.btn{background:var(--panel-2);border:1px solid var(--rule);border-radius:2px;
+  padding:6px 11px;font-family:"Barlow Condensed",sans-serif;font-size:13px;
+  text-transform:uppercase;letter-spacing:.06em;cursor:pointer}
+.btn:hover{border-color:var(--amber);color:var(--amber)}
+.btn.key{background:var(--amber);border-color:var(--amber);color:#15171A;font-weight:600}
+.btn.key:hover{color:#15171A;filter:brightness(1.08)}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+
+.mk{display:grid;grid-template-columns:16px 1fr auto;gap:9px;align-items:center;
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-2);padding:2px 0}
+.dot{width:9px;height:9px;border-radius:50%;justify-self:center}
+.dot.f{background:var(--amber)} .dot.t{background:var(--cyan)}
+
+.json{flex:1;display:flex;flex-direction:column;padding:14px 18px;gap:9px;min-height:250px}
+textarea{flex:1;min-height:190px;width:100%;resize:vertical;
+  background:var(--panel-2);color:var(--ink);border:1px solid var(--rule);border-radius:2px;
+  font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:1.5;padding:10px;
+  white-space:pre;overflow:auto}
+.ver{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;
+  color:#15171A;background:var(--amber);border-radius:2px;padding:2px 5px;
+  position:relative;top:-6px;margin-left:-9px}
+.libitem{display:flex;gap:5px;margin-bottom:5px}
+.libname{flex:1;text-align:left;background:var(--panel-2);border:1px solid var(--rule);
+  border-radius:2px;padding:5px 9px;cursor:pointer;font-family:"IBM Plex Mono",monospace;
+  font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.libname:hover{border-color:var(--amber);color:var(--amber)}
+.libdel{width:26px;background:var(--panel-2);border:1px solid var(--rule);border-radius:2px;
+  cursor:pointer;color:var(--ink-3);font-size:14px;line-height:1}
+.libdel:hover{border-color:#B4453C;color:#B4453C}
+.libin{width:100%;background:var(--panel-2);color:var(--ink);border:1px solid var(--rule);
+  border-radius:2px;padding:6px 9px;font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.ok{color:var(--amber);font-size:12px;min-height:16px;font-family:"IBM Plex Mono",monospace}
+</style>
+
+<header class="bar">
+  <h1>Reflection Bench</h1><span class="ver">v2</span>
+  <span class="sub">two-part oblique mirror &middot; runs offline</span>
+  <button class="btn" id="open">Open image&hellip;</button>
+  <button class="btn key" id="png">Export PNG</button>
+  <input type="file" id="file" accept="image/*">
+  <span class="spacer"></span>
+  <span class="pill" id="readout">&mdash;</span>
+</header>
+
+<div class="wrap">
+  <div class="bench">
+    <div class="holder" id="holder">
+      <div class="stagebox" id="stagebox"><div class="stage" id="stage">
+        <div class="surface"></div>
+
+        <div class="rmask" id="m_frontSharp"><div class="rblur" id="b_frontSharp"><div class="r3d" id="t_frontSharp"><img class="rimg" id="i_frontSharp" alt=""></div></div></div>
+        <div class="rmask" id="m_frontSoft"><div class="rblur" id="b_frontSoft"><div class="r3d" id="t_frontSoft"><img class="rimg" id="i_frontSoft" alt=""></div></div></div>
+        <div class="rmask" id="m_templeSharp"><div class="rblur" id="b_templeSharp"><div class="r3d" id="t_templeSharp"><img class="rimg" id="i_templeSharp" alt=""></div></div></div>
+        <div class="rmask" id="m_templeSoft"><div class="rblur" id="b_templeSoft"><div class="r3d" id="t_templeSoft"><img class="rimg" id="i_templeSoft" alt=""></div></div></div>
+
+        <img class="orig" id="orig" alt="Eyewear frame on a glass surface">
+
+        <svg class="guides" id="guides" viewBox="0 0 1024 1024">
+          <line id="lnSplit"  stroke="var(--violet)" stroke-width="1.5" stroke-dasharray="3 6" opacity=".8"/>
+          <line id="lnFront"  stroke="var(--amber)"  stroke-width="1.5" stroke-dasharray="9 7" opacity=".9"/>
+          <line id="lnTemple" stroke="var(--cyan)"   stroke-width="1.5" stroke-dasharray="9 7" opacity=".9"/>
+          <g id="mFront"><circle r="13" fill="none" stroke="var(--amber)" stroke-width="1.5"/><circle r="2.5" fill="var(--amber)"/><line x1="-19" y1="0" x2="-15" y2="0" stroke="var(--amber)" stroke-width="1.5"/><line x1="15" y1="0" x2="19" y2="0" stroke="var(--amber)" stroke-width="1.5"/><line x1="0" y1="-19" x2="0" y2="-15" stroke="var(--amber)" stroke-width="1.5"/><line x1="0" y1="15" x2="0" y2="19" stroke="var(--amber)" stroke-width="1.5"/></g>
+          <g id="mTemple"><circle r="13" fill="none" stroke="var(--cyan)" stroke-width="1.5"/><circle r="2.5" fill="var(--cyan)"/><line x1="-19" y1="0" x2="-15" y2="0" stroke="var(--cyan)" stroke-width="1.5"/><line x1="15" y1="0" x2="19" y2="0" stroke="var(--cyan)" stroke-width="1.5"/><line x1="0" y1="-19" x2="0" y2="-15" stroke="var(--cyan)" stroke-width="1.5"/><line x1="0" y1="15" x2="0" y2="19" stroke="var(--cyan)" stroke-width="1.5"/></g>
+        </svg>
+      </div></div>
+    </div>
+    <div class="legend">
+      <span class="f"><i></i>front contact</span>
+      <span class="t"><i></i>temple contact</span>
+      <span class="s"><i></i>split</span>
+      <span>Drag either reticle. Drop an image anywhere on the canvas to load it.</span>
+    </div>
+  </div>
+
+  <aside class="rail">
+    <div class="sect">
+      <h2>Presets</h2>
+      <p class="hint">These change the surface finish only. The geometry below was measured from your four reference renders, not styled.</p>
+      <div class="presets" id="presets"></div>
+      <div class="btnrow">
+        <button class="btn key" id="detect">Auto-detect contacts</button>
+        <button class="btn" id="toggleG">Hide guides</button>
+      </div>
+      <div class="mk" style="margin-top:9px"><span class="dot f"></span><span>front pivot</span><span id="posF">&ndash;</span></div>
+      <div class="mk"><span class="dot t"></span><span>temple pivot</span><span id="posT">&ndash;</span></div>
+    </div>
+
+    <div class="sect front" id="gFront"><h2>Front <em>measured +10&deg; / 1.00&times;</em></h2></div>
+    <div class="sect temple" id="gTemple"><h2>Temple <em>measured &minus;33&deg; / 1.53&times;</em></h2></div>
+    <div class="sect" id="gSplit"><h2>Split</h2>
+      <p class="hint">Where the frame front ends and the temple begins. Each side gets its own mirror; the blend hides the seam.</p>
+    </div>
+    <div class="sect" id="gFinish"><h2>Finish</h2></div>
+
+    <div class="sect">
+      <h2>Library</h2>
+      <p class="hint">Saved in this browser. Export to a file to carry settings to another machine.</p>
+      <div id="lib"></div>
+      <div style="margin-top:9px"><input class="libin" id="libname" placeholder="name this setting" spellcheck="false"></div>
+      <div class="btnrow">
+        <button class="btn key" id="save">Save current</button>
+        <button class="btn" id="exportLib">Export</button>
+        <button class="btn" id="importLib">Import</button>
+        <input type="file" id="libfile" accept="application/json,.json">
+      </div>
+    </div>
+
+    <div class="json">
+      <h2 style="font-size:12px;text-transform:uppercase;letter-spacing:.13em;color:var(--ink-2)">Config</h2>
+      <textarea id="cfg" spellcheck="false" aria-label="Reflection configuration JSON"></textarea>
+      <div class="btnrow">
+        <button class="btn key" id="copy">Copy config</button>
+        <button class="btn" id="apply">Apply pasted</button>
+        <button class="btn" id="reset">Reset</button>
+      </div>
+      <div class="ok" id="ok"></div>
+    </div>
+  </aside>
+</div>
+<script>
+/* Reflection Bench v2 -- standalone. No network, no server, no build step.
+ *
+ * Measured off four finished reference renders (correct/*.png).
+ *
+ * A reflection's displacement depends on how high each point sits above the
+ * glass, and a 2D map cannot encode height -- two points at the same place in
+ * the image can sit at different heights. Fitting confirmed it: over the whole
+ * reflection an 8-DOF homography scored NCC 0.01-0.25 and a 4-DOF harmonic
+ * homology 0.12-0.25, while fitting the two parts separately scored 0.59
+ * (front) and 0.60-0.78 (temple). So each part gets its own mirror:
+ *
+ *     front    contact +10 deg,  depth 1.00   (the lens rims rest on the glass)
+ *     temple   contact -33 deg,  depth 1.53   (only the tip touches)
+ *
+ * The temple fit was given no hint where the tip was; its contact line came
+ * back through (970,451) and the tip measures (970,445).
+ *
+ * The mirror is OBLIQUE: points drop straight down onto the contact line, they
+ * do not reflect perpendicular to it. Pivot-local: qx = x, qy = m(1+s)x - s*y.
+ */
+const VERSION = 'v2';
+const SRC = (function(){            // placeholder until a photo is dropped on
+  const c = document.createElement('canvas'); c.width = c.height = 1024;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, 1024, 1024);
+  g.fillStyle = '#b4b4b4'; g.textAlign = 'center';
+  g.font = '600 46px "Barlow Condensed", Barlow, sans-serif';
+  g.fillText('Drop a product photo here', 512, 470);
+  g.font = '22px "IBM Plex Mono", monospace';
+  g.fillText('frame on a pure white background, square', 512, 516);
+  return c.toDataURL('image/png');
+})();
+let W = 1024, H = 1024, srcName = 'placeholder.png';
+
+const PARAMS = [
+  {g:'Front',  k:'f_pivotX',  n:'Pivot X',     min:0,max:4096,step:1,   v:517,  u:'px'},
+  {g:'Front',  k:'f_pivotY',  n:'Pivot Y',     min:0,max:4096,step:1,   v:684,  u:'px'},
+  {g:'Front',  k:'f_angle',   n:'Contact',     min:-60,max:60,step:.25, v:10,   u:'\u00B0'},
+  {g:'Front',  k:'f_depth',   n:'Depth',       min:.2,max:3,  step:.01, v:1.00, u:'\u00D7'},
+  {g:'Front',  k:'f_roll',    n:'Roll',        min:-45,max:45,step:.25, v:0,    u:'\u00B0'},
+  {g:'Front',  k:'f_pitch',   n:'Pitch',       min:-80,max:80,step:.5,  v:0,    u:'\u00B0'},
+  {g:'Front',  k:'f_yaw',     n:'Yaw',         min:-80,max:80,step:.5,  v:0,    u:'\u00B0'},
+  {g:'Front',  k:'f_opacity', n:'Opacity',     min:0, max:1,  step:.01, v:.40,  u:''},
+  {g:'Front',  k:'f_fade',    n:'Fade',        min:20,max:1200,step:5,  v:260,  u:'px'},
+  {g:'Front',  k:'f_curve',   n:'Fade curve',  min:.4,max:4,  step:.05, v:1.40, u:''},
+  {g:'Front',  k:'f_blur',    n:'Blur',        min:0, max:30, step:.5,  v:3,    u:'px'},
+  {g:'Front',  k:'f_blurAt',  n:'Blur onset',  min:0, max:.95,step:.01, v:.15,  u:''},
+
+  {g:'Temple', k:'t_pivotX',  n:'Pivot X',     min:0,max:4096,step:1,   v:983,  u:'px'},
+  {g:'Temple', k:'t_pivotY',  n:'Pivot Y',     min:0,max:4096,step:1,   v:465,  u:'px'},
+  {g:'Temple', k:'t_angle',   n:'Contact',     min:-70,max:30,step:.25, v:-33,  u:'\u00B0'},
+  {g:'Temple', k:'t_depth',   n:'Depth',       min:.2,max:3,  step:.01, v:1.53, u:'\u00D7'},
+  {g:'Temple', k:'t_roll',    n:'Roll',        min:-45,max:45,step:.25, v:0,    u:'\u00B0'},
+  {g:'Temple', k:'t_pitch',   n:'Pitch',       min:-80,max:80,step:.5,  v:0,    u:'\u00B0'},
+  {g:'Temple', k:'t_yaw',     n:'Yaw',         min:-80,max:80,step:.5,  v:0,    u:'\u00B0'},
+  {g:'Temple', k:'t_opacity', n:'Opacity',     min:0, max:1,  step:.01, v:.30,  u:''},
+  {g:'Temple', k:'t_fade',    n:'Fade',        min:20,max:1200,step:5,  v:330,  u:'px'},
+  {g:'Temple', k:'t_curve',   n:'Fade curve',  min:.4,max:4,  step:.05, v:1.30, u:''},
+  {g:'Temple', k:'t_blur',    n:'Blur',        min:0, max:30, step:.5,  v:4,    u:'px'},
+  {g:'Temple', k:'t_blurAt',  n:'Blur onset',  min:0, max:.95,step:.01, v:.20,  u:''},
+
+  {g:'Split',  k:'splitX',    n:'Split at',    min:0,max:4096,step:1,   v:700,  u:'px'},
+  {g:'Split',  k:'persp',     n:'Perspective', min:400,max:9000,step:50, v:2200, u:'px'},
+  {g:'Split',  k:'splitAng',  n:'Split tilt',  min:-45,max:45,step:.5,  v:0,    u:'\u00B0'},
+  {g:'Split',  k:'splitFeat', n:'Split blend', min:1, max:300,step:1,   v:60,   u:'px'},
+
+  {g:'Finish', k:'feather',   n:'Contact edge',min:0, max:40, step:.5,  v:1,    u:'px'},
+  {g:'Finish', k:'whiteCut',  n:'White cut',   min:0, max:40, step:1,   v:6,    u:''},
+  {g:'Finish', k:'brightness',n:'Brightness',  min:.6,max:1.6,step:.01, v:1,    u:'\u00D7'},
+  {g:'Finish', k:'contrast',  n:'Contrast',    min:.5,max:1.8,step:.01, v:1,    u:'\u00D7'},
+  {g:'Finish', k:'zoom',      n:'View zoom',   min:.2,max:2.5,step:.05, v:.70,  u:'\u00D7'}
+];
+
+/* Presets change the surface finish only. Geometry is measured, not styled. */
+const PRESETS = {
+  'Reference' : {f_opacity:.40,f_fade:260,f_curve:1.40,f_blur:3, f_blurAt:.15, t_opacity:.30,t_fade:330,t_curve:1.30,t_blur:4, t_blurAt:.20},
+  'Soft glass': {f_opacity:.24,f_fade:220,f_curve:1.80,f_blur:6, f_blurAt:.05, t_opacity:.18,t_fade:280,t_curve:1.70,t_blur:7, t_blurAt:.10},
+  'Wet gloss' : {f_opacity:.50,f_fade:340,f_curve:1.15,f_blur:2, f_blurAt:.30, t_opacity:.40,t_fade:420,t_curve:1.10,t_blur:2, t_blurAt:.35},
+  'Whisper'   : {f_opacity:.15,f_fade:180,f_curve:2.20,f_blur:9, f_blurAt:0,   t_opacity:.11,t_fade:240,t_curve:2.00,t_blur:10,t_blurAt:0}
+};
+
+const P = {}; PARAMS.forEach(p => P[p.k] = p.v);
+const el = id => document.getElementById(id);
+const rad = d => d*Math.PI/180;
+const pre = part => part === 'front' ? 'f_' : 't_';
+
+/* ---------- geometry ---------- */
+function mirrorK(part){
+  const s = P[pre(part)+'depth'];
+  return {k: Math.tan(rad(P[pre(part)+'angle'])) * (1+s), s: s};
+}
+/* Full 3D orientation per part, about its own pivot.
+   Roll spins in-plane; PITCH tips it around the horizontal axis and YAW around
+   the vertical, which is what makes a temple reflection swing out of the page
+   instead of merely rotating on it. Needs perspective, so the result is a
+   homography rather than an affine -- mat4For feeds CSS matrix3d, homographyFor
+   feeds the canvas exporter and the Python renderer. */
+const M4I = () => [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]];
+function m4mul(a,b){const m=M4I();for(let r=0;r<4;r++)for(let c=0;c<4;c++){let t=0;
+  for(let k=0;k<4;k++)t+=a[r][k]*b[k][c];m[r][c]=t}return m}
+function m4rx(d){const c=Math.cos(rad(d)),s=Math.sin(rad(d));return [[1,0,0,0],[0,c,-s,0],[0,s,c,0],[0,0,0,1]]}
+function m4ry(d){const c=Math.cos(rad(d)),s=Math.sin(rad(d));return [[c,0,s,0],[0,1,0,0],[-s,0,c,0],[0,0,0,1]]}
+function m4rz(d){const c=Math.cos(rad(d)),s=Math.sin(rad(d));return [[c,-s,0,0],[s,c,0,0],[0,0,1,0],[0,0,0,1]]}
+function mat4For(part){
+  const m = mirrorK(part), p = pre(part);
+  const O = [[1,0,0,0],[m.k,-m.s,0,0],[0,0,1,0],[0,0,0,1]];   // the oblique mirror
+  let M = m4rz(P[p+'roll']);
+  M = m4mul(M, m4rx(P[p+'pitch']));
+  M = m4mul(M, m4ry(P[p+'yaw']));
+  return m4mul(M, O);
+}
+function matrixFor(part){
+  const M = mat4For(part);
+  const cm = [0,1,2,3].flatMap(c => [M[0][c],M[1][c],M[2][c],M[3][c]]);
+  return 'perspective(' + P.persp + 'px) matrix3d(' + cm.map(v=>v.toFixed(6)).join(',') + ')';
+}
+/* the z=0 plane through that chain, as a 3x3 on pivot-local coords */
+function homographyFor(part){
+  const M = mat4For(part), Pp = P.persp;
+  return [[M[0][0],M[0][1],M[0][3]],
+          [M[1][0],M[1][1],M[1][3]],
+          [-M[2][0]/Pp,-M[2][1]/Pp,1-M[2][3]/Pp]];
+}
+function inv3(h){
+  const [a,b,c]=h[0],[d,e,f]=h[1],[g,i,j]=h[2];
+  const A=e*j-f*i,B=f*g-d*j,C=d*i-e*g;
+  const det=a*A+b*B+c*C;
+  return [[A/det,(c*i-b*j)/det,(b*f-c*e)/det],
+          [B/det,(a*j-c*g)/det,(c*d-a*f)/det],
+          [C/det,(b*g-a*i)/det,(a*e-b*d)/det]];
+}
+function normalOf(ang){ const t = rad(ang); return [-Math.sin(t), Math.cos(t)]; }
+
+/* where a line through (px,py) at `ang` lands on a CSS gradient axis along its normal */
+function axisOf(px, py, ang){
+  const n = normalOf(ang);
+  const a = Math.atan2(n[0], -n[1]);
+  const L = Math.abs(W*Math.sin(a)) + Math.abs(H*Math.cos(a));
+  return {deg: a*180/Math.PI, d0: L/2 + (px - W/2)*n[0] + (py - H/2)*n[1], n: n};
+}
+
+/* alpha profile of the fade, as a function of t in [0,1] past the contact line */
+function fadeAlpha(part, soft, t){
+  const p = pre(part), bs = P[p+'blurAt'];
+  const w = bs >= 1 ? 0 : Math.min(1, Math.max(0, (t - bs)/(1 - bs)));
+  return Math.pow(1 - t, P[p+'curve']) * (soft ? w : 1 - w);
+}
+
+function fadeCSS(part, soft){
+  const p = pre(part);
+  const ax = axisOf(P[p+'pivotX'], P[p+'pivotY'], P[p+'angle']);
+  const f = P[p+'fade'], N = 22;
+  const st = ['transparent 0px', 'transparent ' + (ax.d0 - P.feather).toFixed(2) + 'px'];
+  for (let i = 0; i <= N; i++){
+    const t = i/N;
+    st.push('rgba(0,0,0,' + fadeAlpha(part, soft, t).toFixed(4) + ') ' + (ax.d0 + t*f).toFixed(2) + 'px');
+  }
+  st.push('transparent ' + (ax.d0 + f).toFixed(2) + 'px');
+  return 'linear-gradient(' + ax.deg.toFixed(3) + 'deg, ' + st.join(',') + ')';
+}
+
+function splitCSS(part){
+  const ax = axisOf(P.splitX, H/2, 90 + P.splitAng);
+  const f = P.splitFeat, a = (ax.d0 - f).toFixed(1), b = ax.d0.toFixed(1);
+  return part === 'front'
+    ? 'linear-gradient(' + ax.deg.toFixed(3) + 'deg, transparent 0px, transparent ' + a + 'px, #000 ' + b + 'px)'
+    : 'linear-gradient(' + ax.deg.toFixed(3) + 'deg, #000 0px, #000 ' + a + 'px, transparent ' + b + 'px)';
+}
+
+function setMask(node, g){ node.style.maskImage = g; node.style.webkitMaskImage = g; }
+
+/* ---------- live preview ---------- */
+function render(){
+  for (const part of ['front','temple']){
+    const p = pre(part), sp = splitCSS(part);
+    for (const soft of [false, true]){
+      const tag = part + (soft ? 'Soft' : 'Sharp');
+      const t = el('t_'+tag);
+      t.style.transform = matrixFor(part);
+      t.style.transformOrigin = P[p+'pivotX'] + 'px ' + P[p+'pivotY'] + 'px';
+      el('b_'+tag).style.filter = soft ? 'blur(' + P[p+'blur'] + 'px)' : 'none';
+      setMask(el('m_'+tag), fadeCSS(part, soft));
+      el('m_'+tag).style.opacity = P[p+'opacity'];
+      setMask(el('i_'+tag), sp);
+    }
+  }
+  const fx = 'brightness(' + P.brightness + ') contrast(' + P.contrast + ')';
+  document.querySelectorAll('.rimg').forEach(n => n.style.filter = fx);
+
+  guide('lnFront',  P.f_pivotX, P.f_pivotY, P.f_angle);
+  guide('lnTemple', P.t_pivotX, P.t_pivotY, P.t_angle);
+  guide('lnSplit',  P.splitX,   H/2,        90 + P.splitAng);
+  el('mFront').setAttribute('transform',  'translate('+P.f_pivotX+','+P.f_pivotY+')');
+  el('mTemple').setAttribute('transform', 'translate('+P.t_pivotX+','+P.t_pivotY+')');
+  el('posF').textContent = P.f_pivotX + ', ' + P.f_pivotY;
+  el('posT').textContent = P.t_pivotX + ', ' + P.t_pivotY;
+
+  el('readout').textContent = srcName + '  ' + W + '\u00D7' + H
+    + '  \u00B7  front ' + P.f_angle.toFixed(1) + '\u00B0 / ' + P.f_depth.toFixed(2) + '\u00D7'
+    + '  \u00B7  temple ' + P.t_angle.toFixed(1) + '\u00B0 / ' + P.t_depth.toFixed(2) + '\u00D7';
+  el('stage').style.transform = 'scale(' + P.zoom + ')';
+  el('stagebox').style.width  = (W*P.zoom) + 'px';
+  el('stagebox').style.height = (H*P.zoom) + 'px';
+  el('cfg').value = JSON.stringify(config(), null, 2);
+}
+
+function guide(id, px, py, ang){
+  const th = rad(ang), dx = Math.cos(th)*4000, dy = Math.sin(th)*4000, g = el(id);
+  g.setAttribute('x1', px-dx); g.setAttribute('y1', py-dy);
+  g.setAttribute('x2', px+dx); g.setAttribute('y2', py+dy);
+}
+
+function config(){
+  return {
+    tool: 'Reflection Bench ' + VERSION, model: 'two-part oblique mirror',
+    source: srcName, size: [W, H],
+    front:  {pivotX:P.f_pivotX, pivotY:P.f_pivotY, angle:P.f_angle, depth:P.f_depth, roll:P.f_roll, pitch:P.f_pitch, yaw:P.f_yaw,
+             opacity:P.f_opacity, fade:P.f_fade, curve:P.f_curve, blur:P.f_blur, blurAt:P.f_blurAt},
+    temple: {pivotX:P.t_pivotX, pivotY:P.t_pivotY, angle:P.t_angle, depth:P.t_depth, roll:P.t_roll, pitch:P.t_pitch, yaw:P.t_yaw,
+             opacity:P.t_opacity, fade:P.t_fade, curve:P.t_curve, blur:P.t_blur, blurAt:P.t_blurAt},
+    split:  {x:P.splitX, angle:P.splitAng, feather:P.splitFeat, perspective:P.persp},
+    finish: {feather:P.feather, whiteCut:P.whiteCut, brightness:P.brightness, contrast:P.contrast}
+  };
+}
+
+function applyConfig(o){
+  const grab = (sec, p, keys) => keys.forEach(k => {
+    if (o[sec] && typeof o[sec][k] === 'number') P[p+k] = o[sec][k]; });
+  grab('front','f_',['pivotX','pivotY','angle','depth','roll','pitch','yaw','opacity','fade','curve','blur','blurAt']);
+  grab('temple','t_',['pivotX','pivotY','angle','depth','roll','pitch','yaw','opacity','fade','curve','blur','blurAt']);
+  if (o.split){ ['x','angle','feather'].forEach((k,i) => {
+    const key = ['splitX','splitAng','splitFeat'][i];
+    if (typeof o.split[k] === 'number') P[key] = o.split[k]; }); }
+  if (o.finish){ ['feather','whiteCut','brightness','contrast'].forEach(k => {
+    if (typeof o.finish[k] === 'number') P[k] = o.finish[k]; }); }
+  syncInputs(); remake(); render();
+}
+
+/* ---------- offline PNG export: same pipeline, on canvas ---------- */
+function newCanvas(){
+  const c = document.createElement('canvas'); c.width = W; c.height = H; return c;
+}
+function gradFor(ctx, ax, from, to){
+  const n = ax.n;
+  return ctx.createLinearGradient(from[0], from[1], to[0], to[1]);
+}
+function composite(){
+  const out = newCanvas(), o = out.getContext('2d');
+  o.fillStyle = '#FFFFFF'; o.fillRect(0, 0, W, H);
+
+  for (const part of ['front','temple']){
+    const p = pre(part);
+    // 1. source, limited to this part of the object
+    const src = newCanvas(), s = src.getContext('2d');
+    s.filter = 'brightness(' + P.brightness + ') contrast(' + P.contrast + ')';
+    s.drawImage(matteImg, 0, 0);
+    s.filter = 'none';
+    s.globalCompositeOperation = 'destination-in';
+    const sax = axisOf(P.splitX, H/2, 90 + P.splitAng), sn = sax.n, sf = P.splitFeat;
+    const sg = s.createLinearGradient(P.splitX - sn[0]*sf, H/2 - sn[1]*sf, P.splitX, H/2);
+    sg.addColorStop(0, part === 'front' ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)');
+    sg.addColorStop(1, part === 'front' ? 'rgba(0,0,0,1)' : 'rgba(0,0,0,0)');
+    s.fillStyle = sg; s.fillRect(0, 0, W, H);
+
+    // 2. the mirror, as an affine about the pivot
+    const px = P[p+'pivotX'], py = P[p+'pivotY'];
+    const Hi = inv3(homographyFor(part));
+    const sctx = src.getContext('2d');
+    const sd = sctx.getImageData(0, 0, W, H).data;
+    const warped = newCanvas(), wc = warped.getContext('2d');
+    const od = wc.createImageData(W, H), q = od.data;
+    for (let y = 0; y < H; y++){
+      const vy = y - py;
+      for (let x = 0; x < W; x++){
+        const vx = x - px;
+        const w = Hi[2][0]*vx + Hi[2][1]*vy + Hi[2][2];
+        if (w === 0) continue;
+        const sx = (Hi[0][0]*vx + Hi[0][1]*vy + Hi[0][2]) / w + px;
+        const sy = (Hi[1][0]*vx + Hi[1][1]*vy + Hi[1][2]) / w + py;
+        const x0 = Math.floor(sx), y0 = Math.floor(sy);
+        if (x0 < 0 || y0 < 0 || x0 + 1 >= W || y0 + 1 >= H) continue;
+        const fx = sx - x0, fy = sy - y0, o = (y*W + x)*4;
+        for (let ch = 0; ch < 4; ch++){
+          const i00 = (y0*W + x0)*4 + ch,     i10 = (y0*W + x0 + 1)*4 + ch;
+          const i01 = ((y0+1)*W + x0)*4 + ch, i11 = ((y0+1)*W + x0 + 1)*4 + ch;
+          q[o+ch] = (sd[i00]*(1-fx) + sd[i10]*fx)*(1-fy)
+                  + (sd[i01]*(1-fx) + sd[i11]*fx)*fy;
+        }
+      }
+    }
+    wc.putImageData(od, 0, 0);
+
+    // 3+4. screen-space blur, then the fade away from the contact line
+    const ax = axisOf(px, py, P[p+'angle']), n = ax.n, f = P[p+'fade'];
+    for (const soft of [false, true]){
+      const lay = newCanvas(), lc = lay.getContext('2d');
+      if (soft && P[p+'blur'] > 0) lc.filter = 'blur(' + P[p+'blur'] + 'px)';
+      lc.drawImage(warped, 0, 0);
+      lc.filter = 'none';
+      lc.globalCompositeOperation = 'destination-in';
+      const fe = Math.max(P.feather, 0.001);
+      const g = lc.createLinearGradient(px - n[0]*fe, py - n[1]*fe,
+                                        px + n[0]*f,  py + n[1]*f);
+      const span = fe + f;
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      for (let i = 0; i <= 22; i++){
+        const t = i/22;
+        g.addColorStop(Math.min(1, (fe + t*f)/span),
+                       'rgba(0,0,0,' + fadeAlpha(part, soft, t).toFixed(4) + ')');
+      }
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      lc.fillStyle = g; lc.fillRect(0, 0, W, H);
+
+      o.globalAlpha = P[p+'opacity'];
+      o.drawImage(lay, 0, 0);
+      o.globalAlpha = 1;
+    }
+  }
+  o.drawImage(matteImg, 0, 0);            // the untouched frame, on top
+  return out;
+}
+
+/* Saving files works from the local copy (file:// or any static host). The
+   Claude Artifact viewer sandboxes downloads away, so say so instead of
+   appearing to do nothing. */
+const EMBEDDED = (function(){ try { return window.self !== window.top; } catch(e){ return true; } })();
+function download(name, url){
+  if (EMBEDDED){
+    flash('Saving is blocked in the hosted preview \u2014 use the local reflection-bench.html');
+    return false;
+  }
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  return true;
+}
+el('png').onclick = () => {
+  const base = srcName.replace(/\.[^.]+$/, '');
+  composite().toBlob(b => {
+    if (download(base + '-reflection.png', URL.createObjectURL(b)))
+      flash('Exported ' + base + '-reflection.png');
+  }, 'image/png');
+};
+
+/* ---------- saved configuration library ---------- */
+const LSKEY = 'reflection-bench-v2/library';
+function libRead(){
+  try { return JSON.parse(localStorage.getItem(LSKEY) || '{}'); }
+  catch (e) { return {}; }
+}
+function libWrite(o){
+  try { localStorage.setItem(LSKEY, JSON.stringify(o)); return true; }
+  catch (e) { flash('Browser storage unavailable'); return false; }
+}
+function libDraw(){
+  const lib = libRead(), names = Object.keys(lib).sort();
+  const box = el('lib'); box.innerHTML = '';
+  if (!names.length){ box.innerHTML = '<p class="hint" style="margin:0">Nothing saved yet.</p>'; return; }
+  names.forEach(name => {
+    const row = document.createElement('div'); row.className = 'libitem';
+    const b = document.createElement('button');
+    b.className = 'libname'; b.textContent = name;
+    b.title = 'Load ' + name;
+    b.onclick = () => { applyConfig(lib[name]); flash('Loaded \u201C' + name + '\u201D'); };
+    const d = document.createElement('button');
+    d.className = 'libdel'; d.textContent = '\u00D7'; d.title = 'Delete ' + name;
+    d.onclick = () => { const l = libRead(); delete l[name]; libWrite(l); libDraw(); flash('Deleted \u201C' + name + '\u201D'); };
+    row.append(b, d); box.append(row);
+  });
+}
+el('save').onclick = () => {
+  const name = (el('libname').value || '').trim() || srcName.replace(/\.[^.]+$/, '');
+  const lib = libRead(); lib[name] = config();
+  if (libWrite(lib)){ el('libname').value = ''; libDraw(); flash('Saved \u201C' + name + '\u201D'); }
+};
+el('exportLib').onclick = () => {
+  const blob = new Blob([JSON.stringify(libRead(), null, 2)], {type:'application/json'});
+  if (download('reflection-bench-library.json', URL.createObjectURL(blob)))
+    flash('Library exported');
+};
+el('importLib').onclick = () => el('libfile').click();
+el('libfile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    try {
+      const incoming = JSON.parse(fr.result);
+      const lib = libRead();
+      Object.keys(incoming).forEach(k => lib[k] = incoming[k]);
+      libWrite(lib); libDraw();
+      flash('Imported ' + Object.keys(incoming).length + ' config(s)');
+    } catch (err) { flash('Not a valid library file'); }
+  };
+  fr.readAsText(f);
+});
+
+/* ---------- controls ---------- */
+const inputs = {};
+PARAMS.forEach(p => {
+  const row = document.createElement('label'); row.className = 'ctl';
+  const dec = (p.step % 1 === 0) ? 0 : (String(p.step).split('.')[1] || '').length;
+  row.innerHTML = '<span class="ctl-name">' + p.n + '</span>';
+  const inp = document.createElement('input');
+  inp.type='range'; inp.min=p.min; inp.max=p.max; inp.step=p.step; inp.value=p.v;
+  const out = document.createElement('output'); out.className='ctl-val';
+  const show = () => out.textContent = (+P[p.k]).toFixed(dec) + p.u;
+  inp.addEventListener('input', () => {
+    P[p.k] = +inp.value; show();
+    if (p.k === 'whiteCut') remake();
+    render();
+  });
+  row.append(inp, out); el('g'+p.g).append(row);
+  inputs[p.k] = {inp: inp, show: show}; show();
+});
+function syncInputs(){ PARAMS.forEach(p => { inputs[p.k].inp.value = P[p.k]; inputs[p.k].show(); }); }
+
+Object.keys(PRESETS).forEach(name => {
+  const b = document.createElement('button'); b.className='btn'; b.textContent=name;
+  b.onclick = () => { Object.assign(P, PRESETS[name]); syncInputs(); render();
+                      flash('Preset \u201C' + name + '\u201D loaded'); };
+  el('presets').append(b);
+});
+
+el('detect').onclick  = () => { autoContact(); flash('Contacts detected'); };
+el('toggleG').onclick = e => {
+  const g = el('guides'); g.classList.toggle('off');
+  e.target.textContent = g.classList.contains('off') ? 'Show guides' : 'Hide guides';
+};
+el('copy').onclick = () => {
+  navigator.clipboard.writeText(el('cfg').value)
+    .then(() => flash('Config copied'))
+    .catch(() => { el('cfg').select(); flash('Selected \u2014 press Cmd+C'); });
+};
+el('apply').onclick = () => {
+  try { applyConfig(JSON.parse(el('cfg').value)); flash('Applied'); }
+  catch (err){ flash('Not valid JSON'); }
+};
+el('reset').onclick = () => { PARAMS.forEach(p => P[p.k] = p.v); syncInputs(); remake(); autoContact(); flash('Reset'); };
+let flashT; function flash(msg){ el('ok').textContent = msg; clearTimeout(flashT); flashT = setTimeout(()=>el('ok').textContent='', 2800); }
+
+/* drag either pivot */
+let drag = null;
+el('stage').addEventListener('pointerdown', e => {
+  if (el('guides').classList.contains('off')) return;
+  const r = el('stage').getBoundingClientRect();
+  const x = (e.clientX-r.left)/P.zoom, y = (e.clientY-r.top)/P.zoom;
+  const df = Math.hypot(x-P.f_pivotX, y-P.f_pivotY), dt = Math.hypot(x-P.t_pivotX, y-P.t_pivotY);
+  if (Math.min(df,dt) > 30/P.zoom) return;
+  drag = df <= dt ? 'f_' : 't_';
+  el('stage').setPointerCapture(e.pointerId); e.preventDefault();
+});
+el('stage').addEventListener('pointermove', e => {
+  if (!drag) return;
+  const r = el('stage').getBoundingClientRect();
+  P[drag+'pivotX'] = Math.round(Math.max(0, Math.min(W, (e.clientX-r.left)/P.zoom)));
+  P[drag+'pivotY'] = Math.round(Math.max(0, Math.min(H, (e.clientY-r.top)/P.zoom)));
+  syncInputs(); render();
+});
+el('stage').addEventListener('pointerup',     () => drag = null);
+el('stage').addEventListener('pointercancel', () => drag = null);
+
+/* ---------- image loading, matting, contact detection ---------- */
+let rawCanvas = null, matteImg = new Image(), bottom = null;
+
+/* Un-premultiply the subject off its white ground. `whiteCut` throws away the
+   near-white noise a JPEG leaves behind, which would otherwise haze the plate. */
+function remake(){
+  if (!rawCanvas) return;
+  const cx = rawCanvas.getContext('2d', {willReadFrequently:true});
+  const d = cx.getImageData(0, 0, W, H), px = d.data;
+  const out = document.createElement('canvas'); out.width = W; out.height = H;
+  const oc = out.getContext('2d');
+  const od = oc.createImageData(W, H), q = od.data;
+  const cut = P.whiteCut;
+  bottom = new Int32Array(W).fill(-1);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+    const i = (y*W + x)*4;
+    let a = 255 - Math.min(px[i], px[i+1], px[i+2]);
+    if (a > 110) bottom[x] = y;
+    a = a <= cut ? 0 : (a - cut) * 255 / (255 - cut);
+    if (a <= 0){ q[i+3] = 0; continue; }
+    const k = a/255, inv = (1-k)*255;
+    q[i]   = Math.max(0, Math.min(255, (px[i]  -inv)/k));
+    q[i+1] = Math.max(0, Math.min(255, (px[i+1]-inv)/k));
+    q[i+2] = Math.max(0, Math.min(255, (px[i+2]-inv)/k));
+    q[i+3] = a;
+  }
+  oc.putImageData(od, 0, 0);
+  const url = out.toDataURL('image/png');
+  matteImg.src = url;
+  document.querySelectorAll('.rimg, .orig').forEach(n => {
+    n.src = url; n.style.width = W+'px'; n.style.height = H+'px'; });
+}
+
+function autoContact(){
+  if (!bottom) return;
+  // FRONT: the line touching the silhouette from below in the most places
+  let best = null;
+  for (let deg = -4; deg <= 24; deg += 0.25){
+    const m = Math.tan(rad(deg));
+    let c = -1e9;
+    for (let x = 0; x < W; x++) if (bottom[x] >= 0) c = Math.max(c, bottom[x] - m*x);
+    if (c < -1e8) continue;
+    let hits = 0, lo = -1, hi = -1;
+    for (let x = 0; x < W; x++){
+      if (bottom[x] < 0) continue;
+      if (Math.abs(bottom[x] - (m*x + c)) <= 3){ hits++; if (lo < 0) lo = x; hi = x; }
+    }
+    const sc = hits + (hi-lo)*0.05 - Math.abs(deg-10)*0.9;
+    if (!best || sc > best.sc) best = {sc:sc, deg:deg, m:m, c:c, hi:hi};
+  }
+  if (best){
+    P.f_pivotX = best.hi;
+    P.f_pivotY = Math.round(best.m*best.hi + best.c);
+    P.f_angle  = +best.deg.toFixed(2);
+  }
+  // TEMPLE: the tip is the lowest ink in the outermost occupied columns
+  let tipX = -1;
+  for (let x = W-1; x >= 0; x--) if (bottom[x] >= 0){ tipX = x; break; }
+  if (tipX >= 0){
+    const win = Math.max(20, Math.round(W*0.04));
+    let bx = tipX, by = bottom[tipX];
+    for (let x = Math.max(0, tipX-win); x <= tipX; x++)
+      if (bottom[x] > by){ by = bottom[x]; bx = x; }
+    P.t_pivotX = bx; P.t_pivotY = by;
+    P.t_angle  = -33;                      // measured constant across references
+    P.splitX   = Math.round(bx - (bx - P.f_pivotX) * 0.62);
+  }
+  syncInputs(); render();
+}
+
+function loadImage(url, name){
+  const img = new Image();
+  img.onload = () => {
+    W = img.naturalWidth; H = img.naturalHeight; srcName = name;
+    rawCanvas = document.createElement('canvas');
+    rawCanvas.width = W; rawCanvas.height = H;
+    rawCanvas.getContext('2d', {willReadFrequently:true}).drawImage(img, 0, 0);
+    document.querySelectorAll('.stage, .rblur, .r3d').forEach(n => {
+      n.style.width = W+'px'; n.style.height = H+'px'; });
+    el('guides').setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    ['f_pivotX','t_pivotX','splitX'].forEach(k => inputs[k].inp.max = W);
+    ['f_pivotY','t_pivotY'].forEach(k => inputs[k].inp.max = H);
+    remake(); autoContact(); render();
+  };
+  img.src = url;
+}
+
+function takeFile(file){
+  if (!file || !file.type.startsWith('image/')) { flash('Not an image file'); return; }
+  const fr = new FileReader();
+  fr.onload = () => { loadImage(fr.result, file.name); flash('Loaded ' + file.name); };
+  fr.readAsDataURL(file);
+}
+el('open').onclick = () => el('file').click();
+el('file').addEventListener('change', e => takeFile(e.target.files[0]));
+const dz = el('holder');
+['dragenter','dragover'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.add('drop'); }));
+['dragleave','drop'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.remove('drop'); }));
+dz.addEventListener('drop', e => takeFile(e.dataTransfer.files[0]));
+
+libDraw();
+loadImage(SRC, srcName);
+</script>

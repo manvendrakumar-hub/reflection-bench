@@ -1,0 +1,35 @@
+# Allow-list: ignore everything, then allow code and docs only.
+# Product photos, renders, PID lists and spreadsheets are company data and must
+# never be committed. Add new source files below explicitly.
+*
+!*/
+
+!.gitignore
+!/README.md
+!/CLAUDE.md
+!/AUDIT.md
+!/requirements.txt
+!/run_offline.sh
+!/reflection-config.json
+!/reflection-bench.html
+!/*.py
+!/research/*.py
+!docs/images/before.jpg
+!docs/images/after.jpg
+
+# never, even if matched above
+# one-off correction scripts: hard-coded internal folders and PID lists
+/correct_0930.py
+/fix_0930b.py
+/incident_*.py
+__pycache__/
+*.pyc
+.agent-audit/
+Agent Audit/
+.claude/
+.codex/
+.agents/
+*.xlsx
+*.csv
+*.zip
+*.log
